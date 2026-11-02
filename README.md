@@ -16,13 +16,12 @@
 
 - **完整路径，端到端**：输入是"名称"（而非 poi_id），工具自己完成检索、过滤、匹配、抠边界全流程。
 - **多源统一**：高德 + 百度两个 Provider，实现同一套「名称 → 候选 → 边界」语义，上层无感知切换。
-- **候选相关性控制**：分类/子面过滤 → 名称相关筛选 → 多结果取舍 → 需要时综合排序，避免把附属医院、幼儿园和其他相似小区混入成果。
-- **坐标自动对齐**：内置 GCJ-02 / BD09 / bd09mc ↔ WGS-84 转换，杜绝"偏移几百米的烂面"。
+- **候选相关性控制**：分类/子面过滤 → 名称相关筛选 → 多结果取舍 → 需要时综合排序，避免把其他相似检索结果混入成果。
+- **坐标自动对齐**：内置 GCJ-02 / BD09 / bd09mc ↔ WGS-84 转换。
 - **三种输出**：GeoJSON（零依赖）/ GeoPackage / Shapefile（后两者需 geopandas）。
-- **结果报告**：额外导出 `summary.csv`（逐地名成败汇总）与 `aoi_attributes.csv`（扁平属性表），无需 GIS 也能核对。
-- **并发抓取**：`request.concurrency` 控制 worker 数，多线程 + 共享限流器，批量清单大幅提速且不超总 QPS。
+- **结果报告**：额外导出 `summary.csv`（逐地名成败汇总）与 `aoi_attributes.csv`（扁平属性表），无需加载到 GIS 也能核对。
 - **边界缓存**：按 poi_id 持久化已抠边界，跨次运行复用，既提速又降低反爬风险。
-- **断点续跑**：按名称记已完成清单，中断后 `--resume` 接着跑，不重复请求（**依赖 `cache.enabled: true` 回填已抠几何**，见下文「断点续跑」说明）。
+- **断点续跑**：按名称记已完成清单，中断后 `--resume` 接着跑，不重复请求。
 - **成果独立归档**：每次运行写入 `runs/时间_CSV文件名_引擎/` 新目录，含配置快照、状态与日志；多结果默认全部保留。
 - **密钥安全**：YAML 配置 / `key_file` / 环境变量三级来源，密钥不进命令行、不提交 Git。
 - **轻量**：核心仅需 `requests` + `pyyaml`；GeoJSON 导出零额外依赖，gpkg/shp 导出才需 geopandas。
@@ -30,7 +29,7 @@
 ## 安装
 
 ```bash
-git clone <仓库地址> get-aoi
+git clone https://github.com/Urbankernel/get_aoi get-aoi
 cd get-aoi
 pip install -r requirements.txt 
 ```
@@ -81,11 +80,7 @@ get-aoi run -c configs/example.yaml --provider baidu --want main --city 上海
 ```
 
 > ⚠️ **断点续跑的前提：`cache.enabled` 必须为 `true`（默认即是）。**
-> 断点文件 `state.json` 只记录每个面「存在过」的摘要（poi_id 等），**不保存几何坐标**；
-> 续跑时靠 poi_id 从边界缓存（`~/.cache/get_aoi`）回填完整几何，再把「上次已完成 + 本次新抓」合并导出，
-> 避免覆盖历史成果。若关闭了缓存（`cache.enabled: false`）或清空了缓存目录，
-> 已完成的项无法回填，工具会**自动清除这些项的完成标记并重新抓取**（不丢数据，但多耗检索配额）。
-> 因此：**续跑前请保持 `cache.enabled: true`，且不要删除 `cache.dir` 指向的缓存目录**。
+> 断点文件 `state.json` 只记录每个面「存在过」的摘要（poi_id 等），**不保存几何坐标**；续跑时靠 poi_id 从边界缓存（`~/.cache/get_aoi`）回填完整几何，再把「上次已完成 + 本次新抓」合并导出，避免覆盖历史成果。若关闭了缓存（`cache.enabled: false`）或清空了缓存目录，已完成的项无法回填，工具会**自动清除这些项的完成标记并重新抓取**。因此：**续跑前请保持 `cache.enabled: true`，且不要删除 `cache.dir` 指向的缓存目录**。
 
 ## 准备工作
 
@@ -99,7 +94,7 @@ get-aoi run -c configs/example.yaml --provider baidu --want main --city 上海
    广州塔,广州,,
    ```
 
-   `name` 必填；`city` 可选（缩小检索范围）；`lng,lat` 可选（参考坐标，用于距离打分与 `user_loc`）。
+   `name` 必填；`city` 建议填写，可缩小检索范围；`lng,lat` 可选（参考坐标，用于距离打分与 `user_loc` 请求参数）。
 
 ## 配置
 
@@ -113,10 +108,10 @@ get-aoi run -c configs/example.yaml --provider baidu --want main --city 上海
 | `city` | 全局城市（csv 无 city 列时生效） | "" |
 | `want` | 多结果取舍：`all` 全部 / `main` 取最优 / `keyword` 指定 | all |
 | `keyword` | `want=keyword` 时的分支关键词 | "" |
-| `keep_types` | 分类白名单，逗号分隔，任一级命中即保留（可填一级或二级分类） | "" |
+| `keep_types` | 分类白名单，逗号分隔，任一级命中即保留（可填一级或二级分类，取值参考 `docs/` 分类表） | "" |
 | `min_area` / `max_area` | 面积过滤（km²） | 0 / 1e9 |
-| `max_candidates` | 每地名最大候选数 | 25 |
-| `request.min_interval` / `.max_interval` | 请求间隔秒（随机抖动） | 1.0 / 3.0 |
+| `max_candidates` | 每地名最大候选数 | 10 |
+| `request.min_interval` / `.max_interval` | 请求间隔秒（随机抖动） | 3.0 / 10.0 |
 | `request.retries` | 失败重试次数 | 3 |
 | `request.timeout` | 单次请求超时（秒） | 15.0 |
 | `request.proxy` | 代理，如 `http://127.0.0.1:7890` | "" |
@@ -127,15 +122,18 @@ get-aoi run -c configs/example.yaml --provider baidu --want main --city 上海
 | `cache.enabled` | 是否启用按 poi_id 的边界缓存 | true |
 | `cache.dir` | 缓存目录（留空则 `~/.cache/get_aoi`） | "" |
 
+**`keep_types` 分类取值**：高德、百度各自维护独立的 POI 分类体系，`keep_types` 可填任意一级或二级分类名称，任一级命中即保留。分类取值参考 `docs/` 下的平台分类表：
+
+- 百度：`docs/百度地图POI行业分类.xlsx`（35 个一级分类、281 个二级分类）
+- 高德：`docs/高德POI分类与编码（中英文）_V1.06_20230208.xlsx`
+
 **密钥三级来源**（优先级从高到低）：
 
 1. **配置文件 `keys` 字段**：`keys: { amap: "xxx", baidu: "yyy" }`
 2. **`key_file` 文件**：每行 `字段=值`（`amap=xxx` / `baidu=yyy`；`#` 开头为注释）。复制 `configs/keys.txt.example` 为 `configs/keys.txt` 后填写。
 3. **环境变量**：`AMAP_KEY` / `BAIDU_AK`
 
-> `.gitignore` 已排除 `configs/keys.txt` 与 `.env`，不会默认提交真实密钥。请仅提交 `configs/keys.txt.example` 模板；若密钥曾泄露，应立即到对应平台重置。
-
-如果网页隐藏接口触发人机验证，还可在配置中提供浏览器会话（通常不需要）：
+如果网页隐藏接口触发人机验证，还可在配置中提供浏览器会话：
 
 ```yaml
 headers:
@@ -152,9 +150,9 @@ headers:
   baidu_user_agent: ""
 ```
 
-获取方式：浏览器正常打开目标地点并完成验证 → `F12` → `Network` → 选择 **Request Method 为 GET** 且成功的 `getPoiInfo?id=...` → `Headers` → `Request Headers`。先复制 `Cookie` 和 `User-Agent`；仍触发风控时再整组复制动态头。OPTIONS 预检请求通常没有 Cookie，不能作为配置来源。
+获取方式：浏览器正常打开目标地点并完成验证 → `F12` → `Network` → 选择 **Request Method 为 GET** 且成功的 `getPoiInfo?id=...` → `Headers` → `Request Headers`。先复制 `Cookie` 和 `User-Agent`；仍触发风控时再整组复制动态头。
 
-动态头只附加到高德 `getPoiInfo` 边界请求，不会用于官方 `place/text` 检索。它们可能随会话过期，更新时应从同一次成功 GET 整组重新复制。Cookie 与动态头均属敏感信息，不要截图公开或提交到 Git。
+动态头只附加到边界请求，不会用于官方 `place/text` 检索。它们可能随会话过期，更新时应从同一次成功 GET 整组重新复制。
 
 ## 输出
 
@@ -168,12 +166,12 @@ runs/20261025_180121_names_amap/
 └── outputs/
     ├── aoi.geojson         # 成果（WGS-84，format 为 gpkg/shp 时对应 aoi.gpkg / aoi.shp）
     ├── summary.csv         # 逐地名成败汇总（name / status / matched_count）
-    └── aoi_attributes.csv  # 每个 AOI 面的扁平属性表（可直接用 Excel/WPS 打开）
+    └── aoi_attributes.csv  # 每个 AOI 面的扁平属性表
 ```
 
 `summary.csv` 每行一个输入地名，记录 `Matched` / `No Candidate` / `No Geometry` 及匹配面数，快速核对哪些成功、哪些失败；`aoi_attributes.csv` 每行一个 AOI 面，含 poi_id、名称、分类、地址、面积、中心点及高德扩展属性，数组字段转成 JSON 字符串（可用 `json.loads()` 还原）。两者由 `outputs.report` 控制，默认开启。
 
-没有匹配到 AOI 时不生成输出文件。输出的 GeoJSON 可直接拖入 QGIS / ArcGIS Pro，叠加卫星底图检查边界是否贴合。
+没有匹配到 AOI 时不生成输出文件。
 
 ### 高德扩展属性
 
@@ -200,17 +198,17 @@ GeoJSON 中前两个数组字段保留为 JSON 数组。GeoPackage 中使用完�
 | `--city` | 全局城市（覆盖配置） |
 | `--want` | 多结果取舍 `all` / `main` / `keyword`（覆盖配置） |
 | `--keyword` | `want=keyword` 时的分支关键词 |
-| `--keep-types` | 分类白名单，逗号分隔，任一级命中即保留 |
+| `--keep-types` | 分类白名单，逗号分隔，任一级命中即保留（取值参考 `docs/` 分类表） |
 | `--min-area` / `--max-area` | 面积过滤（km²） |
 | `--max-candidates` | 每地名最大候选数 |
 | `--output-dir` | run 目录根（覆盖 `outputs.dir`） |
 | `--format` | 输出格式 `geojson` / `gpkg` / `shp` |
 | `--resume` | 从既有 run 目录断点续跑（须保持 `cache.enabled: true` 且缓存目录未被清空，见上文） |
 
-**多校区取舍**（"同济大学"有 5 个平级校区时）：
+例如，通过 `wand` 参数进行**多校区取舍**（"同济大学"有 5 个平级校区时）：
 
 ```bash
-get-aoi run -c config.yaml --want main                  # 只要主校区（综合排序取最优）
+get-aoi run -c config.yaml --want main                  # 只要四平路主校区（综合排序取最优）
 get-aoi run -c config.yaml --want all                   # 全部校区都要（默认）
 get-aoi run -c config.yaml --want keyword --keyword 嘉定  # 只要嘉定校区
 ```
@@ -288,7 +286,6 @@ get-aoi convert -i in.csv --crs wgs84 --to bd09mc  # wgs84 → 百度墨卡托�
 5. 若仍触发风控，说明当前 IP/会话不被接口接受，应稍后重试或更换合规网络；正式批量项目请申请官方 AOI 高阶服务，工具无法绕过平台风控。
 
 > 触发风控中断时，已完成的部分成果会先落盘到 run 目录，可用 `--resume` 续跑，不丢数据。
-> 续跑依赖 `cache.enabled: true` 回填已抠几何；缓存被关闭或清空时，已完成项会自动重抓（见上文「断点续跑」前提）。
 
 ### 百度与高德数据有出入（平台数据差异，非工具问题）
 
@@ -322,15 +319,9 @@ get-aoi/
 │   └── exporters/           # geojson / shapefile / geopackage / csv
 ├── data/names.csv           # 示例地名清单
 ├── runs/                    # 每次运行的独立成果目录（Git 忽略）
-├── docs/providers.md        # 各源接口、权限、配额、反爬说明
+├── docs/                    # providers.md（接口/权限/配额/反爬）+ 高德/百度 POI 分类表（keep_types 取值参考）
 └── tests/                   # 离线测试（坐标 / 配置 / 过滤 / 排序 / 目录 / 风控 / 端到端）
 ```
 
-## 参考来源与致谢
-
-- 开源项目：`BaiduAOISpider`（综合排序匹配思路）、`GetAOI`、`wanzixin/getShp`、`busLineSpyder`、`Plot_Isochrone`
-- 坐标算法：`coordTransform_py`（wandergis）、`geo_convert`（gaussic）
-- 技术文章：《黑科技 | 百度地图抓取地块功能（上/下）》
-- 官方文档：高德开放平台 Web 服务 API、百度地图开放平台
 
 License: MIT

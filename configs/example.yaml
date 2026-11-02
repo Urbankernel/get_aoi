@@ -75,7 +75,7 @@ request:
 # ────────────────────────────────────────────────────────────────
 outputs:
   dir: runs                    # run 目录根（每次运行独立子目录）
-  format: gpkg              # geojson | gpkg | shp（gpkg/shp 需 pip install geopandas）
+  format: geojson              # geojson | gpkg | shp（gpkg/shp 需 pip install geopandas）
   report: true                 # 额外导出 summary.csv 与 aoi_attributes.csv（可用 Excel 打开核对）
 
 # ────────────────────────────────────────────────────────────────
