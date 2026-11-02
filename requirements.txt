@@ -1,0 +1,6 @@
+# 核心依赖（检索 + 抠边界 + GeoJSON 导出 + YAML 配置）
+requests>=2.28.0
+pyyaml>=6.0
+
+# 可选：导出 Shapefile / GeoPackage 时需要（仅 GeoJSON 导出无需安装）
+# geopandas>=0.13.0

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "get-aoi"
+version = "0.1.0"
+description = "名称 → AOI 兴趣面获取工具（高德 / 百度）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "get-aoi contributors" }]
+keywords = ["aoi", "gaode", "amap", "baidu", "gis", "boundary"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "requests>=2.28",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# geopandas 用于导出 GeoPackage / Shapefile 矢量成果（仅 GeoJSON 导出无需安装）
+vector = ["geopandas>=0.13"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+get-aoi = "get_aoi.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

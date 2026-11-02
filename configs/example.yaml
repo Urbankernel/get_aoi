@@ -1,0 +1,88 @@
+# ────────────────────────────────────────────────────────────────
+# get-aoi 配置示例
+#   用法:
+#     get-aoi run -c configs/example.yaml
+#     get-aoi run -c configs/example.yaml --resume runs/xxx   # 断点续跑
+#     get-aoi estimate -c configs/example.yaml                # 干跑估算
+#     get-aoi convert -i in.csv --crs gcj02                   # 仅坐标转换（不联网）
+# ────────────────────────────────────────────────────────────────
+
+# ────────────────────────────────────────────────────────────────
+# Part 1
+# 【数据源密钥】高德 Web 服务 Key / 百度服务端 AK，三选一
+#   优先级：keys 字段 > key_file 文件 > 环境变量 AMAP_KEY / BAIDU_AK
+#   高德：https://lbs.amap.com  百度：https://lbsyun.baidu.com
+# ────────────────────────────────────────────────────────────────
+# keys:
+#   amap: "你的高德Web服务Key"
+#   baidu: "你的百度服务端AK"
+
+key_file: "configs/keys.txt"    # 每行 字段=值（amap=xxx / baidu=yyy；# 开头为注释）
+# 环境变量：AMAP_KEY / BAIDU_AK
+
+# ────────────────────────────────────────────────────────────────
+# Part 2
+# 【输入与数据源】地名清单 + 数据源选择
+# ────────────────────────────────────────────────────────────────
+provider: amap                 # amap | baidu
+input: "data/names.csv"        # 地名清单（列：name 必填；city / lng / lat 可选）
+city: ""                       # 全局城市（csv 无 city 列时生效）
+
+# ────────────────────────────────────────────────────────────────
+# Part 3
+# 【候选处理】多结果取舍与过滤
+# ────────────────────────────────────────────────────────────────
+want: all                      # all=全部相关结果 / main=综合排序取最优 / keyword=指定分支
+keyword: ""                    # want=keyword 时的分支关键词（如"杨浦"）
+keep_types: ""                 # 分类白名单，逗号分隔，任一级命中即保留（可填一级或二级分类，如"住宅区"）
+min_area: 0.0                  # 最小面积 km²
+max_area: 1000000000.0         # 最大面积 km²
+max_candidates: 10             # 每地名最大候选数
+
+# ────────────────────────────────────────────────────────────────
+# Part 4
+# 【请求控制】限速与重试，避免触发高德/百度限流与风控
+# ────────────────────────────────────────────────────────────────
+request:
+  min_interval: 3.0            # 请求最小间隔（秒）
+  max_interval: 10.0            # 请求最大间隔（秒，随机抖动）
+  retries: 3                   # 失败重试次数
+  timeout: 15.0                # 单次请求超时（秒）
+  proxy: ""                    # 代理，如 http://127.0.0.1:7890
+  concurrency: 1               # 并发 worker 数（1=串行；>1 时共享限流器控制总 QPS）
+
+# ────────────────────────────────────────────────────────────────
+# Part 5
+# 【网页隐藏接口风控】（可选）触发人机验证时，从浏览器同一成功 GET 请求复制
+#   字段名对应环境变量：AMAP_COOKIE / AMAP_USER_AGENT / AMAP_BX_UA 等
+#   Cookie 属敏感信息，建议走 key_file 或环境变量，不要提交到 git
+# ────────────────────────────────────────────────────────────────
+# headers:
+#   amap_cookie: "cna=xxx; other=xxx"
+#   amap_user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ..."
+#   amap_bx_ua: ""             # 仅 Cookie + UA 仍失败时再整组复制动态头
+#   amap_bx_umidtoken: ""
+#   amap_bx_et: ""
+#   amap_x_csrf_token: ""
+#   amap_x_adiu: ""
+#   amap_referer: ""
+#   baidu_cookie: ""
+#   baidu_user_agent: ""
+
+# ────────────────────────────────────────────────────────────────
+# Part 6
+# 【输出产物】
+# ────────────────────────────────────────────────────────────────
+outputs:
+  dir: runs                    # run 目录根（每次运行独立子目录）
+  format: gpkg              # geojson | gpkg | shp（gpkg/shp 需 pip install geopandas）
+  report: true                 # 额外导出 summary.csv 与 aoi_attributes.csv（可用 Excel 打开核对）
+
+# ────────────────────────────────────────────────────────────────
+# Part 7
+# 【边界缓存】按 poi_id 缓存已抠出的边界，跨次运行复用
+#   既提速，也降低批量重跑时被反爬识别的风险
+# ────────────────────────────────────────────────────────────────
+cache:
+  enabled: true                # 是否启用边界缓存
+  dir: ""                      # 缓存目录；留空用 ~/.cache/get_aoi

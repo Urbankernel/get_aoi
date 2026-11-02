@@ -1,0 +1,28 @@
+# get-aoi 密钥文件模板
+# 使用方法：复制本文件为 configs/keys.txt，再填写真实值。
+#   Windows: copy configs\keys.txt.example configs\keys.txt
+# 每行「字段=值」；# 开头为注释。key_file 已在 .gitignore 中排除，请勿提交真实密钥。
+
+# 高德开放平台「Web 服务」类型 Key：https://lbs.amap.com
+amap=你的高德Web服务Key
+
+# 百度地图开放平台「服务端」AK：https://lbsyun.baidu.com
+baidu=你的百度服务端AK
+
+# 可选：网页隐藏接口触发人机验证时，从同一浏览器成功 GET 请求复制（Cookie 属敏感信息）。
+# 通常在浏览器 F12 → Network → getPoiInfo/qt=ext → Headers → Request Headers 查看。
+# Cookie 属于敏感信息，不要公开；过期后需重新复制。
+
+# amap_cookie=cna=xxx; other_cookie=xxx
+# amap_user_agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...
+
+# 若仅 Cookie + UA 仍触发风控，再从同一个成功的 GET getPoiInfo 请求复制以下值。
+
+# amap_bx_ua=
+# amap_bx_umidtoken=
+# amap_bx_et=
+# amap_x_csrf_token=
+# amap_x_adiu=
+# amap_referer=
+# baidu_cookie=BAIDUID=xxx; other_cookie=xxx
+# baidu_user_agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...
